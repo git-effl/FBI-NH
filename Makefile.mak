@@ -32,6 +32,10 @@ VERSION_MICRO := $(word 3, $(VERSION_PARTS))
 # APP_DESCRIPTION is the description of the app stored in the SMDH file (Optional)
 # APP_AUTHOR is the author of the app stored in the SMDH file (Optional)
 # ICON is the filename of the icon (.png), relative to the project folder.
+#   If not set, it attempts to use one of the following (in this order):
+#     - <Project name>.png
+#     - icon.png
+#     - <libctru folder>/default_icon.png
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
@@ -43,6 +47,7 @@ INCLUDES	:=
 GRAPHICS	:=
 GFXBUILD	:=	$(BUILD)
 ROMFS		:=	romfs
+#GFXBUILD	:=	$(ROMFS)/gfx
 
 APP_TITLE	:=	FBI-NH
 APP_DESCRIPTION	:=	Open source title manager.
@@ -57,23 +62,6 @@ BANNER_IMAGE := $(TOPDIR)/meta/banner_3ds.cgfx
 ZSTD_DIR  		:= $(CURDIR)/externals/zstd
 ZSTD_OUT  		?= $(CURDIR)/$(BUILD)/zstd
 ZSTD_SEEK_DIR   := $(ZSTD_DIR)/contrib/seekable_format
-
-ZSTD_OBJS := \
-	$(ZSTD_OUT)/lib/common/entropy_common.o \
-	$(ZSTD_OUT)/lib/common/fse_decompress.o \
-	$(ZSTD_OUT)/lib/compress/hist.o \
-	$(ZSTD_OUT)/lib/common/error_private.o \
-	$(ZSTD_OUT)/lib/common/pool.o \
-	$(ZSTD_OUT)/lib/common/threading.o \
-	$(ZSTD_OUT)/lib/common/xxhash.o \
-	$(ZSTD_OUT)/lib/common/debug.o \
-	$(ZSTD_OUT)/lib/common/zstd_common.o \
-	$(ZSTD_OUT)/lib/decompress/zstd_decompress.o \
-	$(ZSTD_OUT)/lib/decompress/zstd_decompress_block.o \
-	$(ZSTD_OUT)/lib/decompress/zstd_ddict.o \
-	$(ZSTD_OUT)/lib/decompress/huf_decompress.o \
-	$(ZSTD_OUT)/seek/zstdseek_compress.o \
-	$(ZSTD_OUT)/seek/zstdseek_decompress.o
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -94,13 +82,15 @@ LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 LIBS	:= -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lcitro3d -lctru -lm -lz -ljansson -lzstd-seekable
 
 #---------------------------------------------------------------------------------
-# list of directories containing libraries
+# list of directories containing libraries, this must be the top level containing
+# include and lib
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(CTRULIB) $(PORTLIBS)
 
 
 #---------------------------------------------------------------------------------
-# Main makefile logic branch
+# no real need to edit anything past this point unless you need to add additional
+# rules for different file extensions
 #---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
@@ -122,12 +112,19 @@ SHLISTFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.shlist)))
 GFXFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.t3s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
+ZSTD_SEEK_OBJS := $(addprefix $(ZSTD_OUT)/seek/,\
+                    zstdseek_compress.o zstdseek_decompress.o)
+
+#---------------------------------------------------------------------------------
+# use CXX for linking C++ projects, CC for standard C
+#---------------------------------------------------------------------------------
 ifeq ($(strip $(CPPFILES)),)
 	export LD	:=	$(CC)
 else
 	export LD	:=	$(CXX)
 endif
 
+#---------------------------------------------------------------------------------
 ifeq ($(GFXBUILD),$(BUILD))
 export T3XFILES :=  $(GFXFILES:.t3s=.t3x)
 else
@@ -135,7 +132,7 @@ export ROMFS_T3XFILES	:=	$(patsubst %.t3s, $(GFXBUILD)/%.t3x, $(GFXFILES))
 export T3XHFILES		:=	$(patsubst %.t3s, $(BUILD)/%.h, $(GFXFILES))
 endif
 
-export OFILES_SOURCES 	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o) $(ZSTD_OBJS)
+export OFILES_SOURCES 	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) \
 			$(PICAFILES:.v.pica=.shbin.o) $(SHLISTFILES:.shlist=.shbin.o) \
@@ -152,8 +149,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			-I$(CURDIR)/$(BUILD) \
 			-I$(ZSTD_SEEK_DIR) \
 			-I$(ZSTD_DIR)/lib \
-			-I$(ZSTD_DIR)/lib/common \
-			-I$(ZSTD_DIR)/lib/compress
+			-I$(ZSTD_DIR)/lib/common
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 			-L$(ZSTD_OUT)
@@ -161,7 +157,14 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 export _3DSXDEPS	:=	$(if $(NO_SMDH),,$(OUTPUT).smdh)
 
 ifeq ($(strip $(ICON)),)
-	export APP_ICON := $(TOPDIR)/$(firstword $(wildcard $(TARGET).png icon.png))
+	icons := $(wildcard *.png)
+	ifneq (,$(findstring $(TARGET).png,$(icons)))
+		export APP_ICON := $(TOPDIR)/$(TARGET).png
+	else
+		ifneq (,$(findstring icon.png,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.png
+		endif
+	endif
 else
 	export APP_ICON := $(TOPDIR)/$(ICON)
 endif
@@ -182,70 +185,14 @@ all: $(BUILD) $(GFXBUILD) $(DEPSDIR) $(ROMFS_T3XFILES) $(T3XHFILES) zstd-seekabl
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
-# Explicit Zstd Compilation Rules
+# Build the Zstandard seekable static library
 #---------------------------------------------------------------------------------
 
-$(ZSTD_OUT)/lib/common/entropy_common.o: $(ZSTD_DIR)/lib/common/entropy_common.c
+$(ZSTD_OUT)/seek/%.o: $(ZSTD_SEEK_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
-$(ZSTD_OUT)/lib/common/fse_decompress.o: $(ZSTD_DIR)/lib/common/fse_decompress.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/compress/hist.o: $(ZSTD_DIR)/lib/compress/hist.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/error_private.o: $(ZSTD_DIR)/lib/common/error_private.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/pool.o: $(ZSTD_DIR)/lib/common/pool.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/threading.o: $(ZSTD_DIR)/lib/common/threading.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/xxhash.o: $(ZSTD_DIR)/lib/common/xxhash.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/debug.o: $(ZSTD_DIR)/lib/common/debug.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/common/zstd_common.o: $(ZSTD_DIR)/lib/common/zstd_common.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/decompress/zstd_decompress.o: $(ZSTD_DIR)/lib/decompress/zstd_decompress.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/decompress/zstd_decompress_block.o: $(ZSTD_DIR)/lib/decompress/zstd_decompress_block.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/decompress/zstd_ddict.o: $(ZSTD_DIR)/lib/decompress/zstd_ddict.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/lib/decompress/huf_decompress.o: $(ZSTD_DIR)/lib/decompress/huf_decompress.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/seek/zstdseek_compress.o: $(ZSTD_SEEK_DIR)/zstdseek_compress.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/seek/zstdseek_decompress.o: $(ZSTD_SEEK_DIR)/zstdseek_decompress.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-$(ZSTD_OUT)/libzstd-seekable.a: $(ZSTD_OBJS)
+$(ZSTD_OUT)/libzstd-seekable.a: $(ZSTD_OUT)/seek/zstdseek_compress.o $(ZSTD_OUT)/seek/zstdseek_decompress.o
 	@$(AR) rcs $@ $^
 
 zstd-seekable: $(ZSTD_OUT)/libzstd-seekable.a
@@ -277,12 +224,13 @@ $(GFXBUILD)/%.t3x	$(BUILD)/%.h	:	%.t3s
 
 #---------------------------------------------------------------------------------
 else
+
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
 $(OUTPUT).cia	:	$(OUTPUT).3dsx
-	/c/devkitPro/bannertool/bannertool makebanner -ci $(BANNER_IMAGE) -a $(BANNER_AUDIO) -o "banner.bin"
-	/c/devkitPro/makerom/makerom.exe -f cia -o $@ -target t -elf $(OUTPUT).elf -rsf $(TOPDIR)/build-cia.rsf -exefslogo -icon $(OUTPUT).smdh -banner "banner.bin" -logo $(TOPDIR)/meta/logo_3ds.bcma.lz -DAPP_ROMFS="$(TOPDIR)/$(ROMFS)" -major $(VERSION_MAJOR) -minor $(VERSION_MINOR) -micro $(VERSION_MICRO) -DAPP_VERSION_MAJOR="$(VERSION_MAJOR)"
+	@bannertool makebanner -ci $(BANNER_IMAGE) -a $(BANNER_AUDIO) -o "banner.bin"
+	@makerom -f cia -o $@ -target t -elf $(OUTPUT).elf -rsf $(TOPDIR)/build-cia.rsf -exefslogo -icon $(OUTPUT).smdh -banner "banner.bin" -logo $(TOPDIR)/meta/logo_3ds.bcma.lz -DAPP_ROMFS="$(TOPDIR)/$(ROMFS)" -major $(VERSION_MAJOR) -minor $(VERSION_MINOR) -micro $(VERSION_MICRO) -DAPP_VERSION_MAJOR="$(VERSION_MAJOR)"
 
 $(OUTPUT).3dsx	:	$(OUTPUT).elf $(_3DSXDEPS)
 
