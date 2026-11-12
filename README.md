@@ -5,7 +5,7 @@ FBI-NH is an open source title manager for the 3DS. FBI was originally authored 
 Requires [devkitARM](https://devkitpro.org/wiki/Getting_Started), along with 3ds-curl, 3ds-zlib,3ds-bzip2 and 3ds-jansson from the devkitPro pacman repository, to build. 
 ```bash
 git clone https://github.com/git-effl/FBI-NH-git --recursive
-make CFLAGS="-O2 -g -Wall -mword-relocations -ffunction-sections -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -D__3DS__ -DVERSION_MAJOR=2 -DVERSION_MINOR=6 -DVERSION_MICRO=1 -I$(pwd)/build -I$(pwd)/externals/zstd/lib -I$(pwd)/externals/zstd/lib/common -I$(pwd)/externals/zstd/contrib/seekable_format -I/opt/devkitpro/libctru/include -I/opt/devkitpro/portlibs/3ds/include"
+make VERSION_MAJOR=2 VERSION_MINOR=6 VERSION_MICRO=1 CFLAGS="-O2 -g -Wall -mword-relocations -ffunction-sections -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -D__3DS__ -DZSTD_DISABLE_ASM -DVERSION_MAJOR=2 -DVERSION_MINOR=6 -DVERSION_MICRO=1 -I$(pwd)/build -I$(pwd)/externals/zstd/lib -I$(pwd)/externals/zstd/lib/common -I$(pwd)/externals/zstd/contrib/seekable_format -I/opt/devkitpro/libctru/include -I/opt/devkitpro/portlibs/3ds/include"
 ```
 
 
