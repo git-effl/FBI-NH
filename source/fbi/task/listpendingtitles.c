@@ -18,11 +18,11 @@ static int task_populate_pending_titles_compare_ids(const void* e1, const void* 
 static Result task_populate_pending_titles_from(populate_pending_titles_data* data, FS_MediaType mediaType) {
     Result res = 0;
 
-    u32 pendingTitleCount = 0;
-    if(R_SUCCEEDED(res = AM_GetPendingTitleCount(&pendingTitleCount, mediaType, AM_STATUS_MASK_INSTALLING | AM_STATUS_MASK_AWAITING_FINALIZATION))) {
+    u32 pendingTitleCount = 256;
+    if(true) {
         u64* pendingTitleIds = (u64*) calloc(pendingTitleCount, sizeof(u64));
         if(pendingTitleIds != NULL) {
-            if(R_SUCCEEDED(res = AM_GetPendingTitleList(&pendingTitleCount, pendingTitleCount, mediaType, AM_STATUS_MASK_INSTALLING | AM_STATUS_MASK_AWAITING_FINALIZATION, pendingTitleIds))) {
+            if(R_SUCCEEDED(res = AM_GetPendingTitleList(&pendingTitleCount, pendingTitleIds, pendingTitleCount, mediaType))) {
                 qsort(pendingTitleIds, pendingTitleCount, sizeof(u64), task_populate_pending_titles_compare_ids);
 
                 AM_PendingTitleEntry* pendingTitleInfos = (AM_PendingTitleEntry*) calloc(pendingTitleCount, sizeof(AM_PendingTitleEntry));

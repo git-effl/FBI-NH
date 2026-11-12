@@ -41,7 +41,8 @@ TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source/core source/core/data source/core/task source/core/ui \
 				source/core/z3ds source/fbi source/fbi/action source/fbi/task \
-				source/libs/quirc source/libs/stb_image
+				source/libs/quirc source/libs/stb_image \
+				externals/zstd/lib/common externals/zstd/lib/compress externals/zstd/lib/decompress
 DATA		:=
 INCLUDES	:=
 GRAPHICS	:=
@@ -79,7 +80,7 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lcitro3d -lctru -lm -lz -ljansson -lzstd-seekable -lzstd 
+LIBS	:= -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lcitro3d -lctru -lm -lz -ljansson -lzstd-seekable
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
